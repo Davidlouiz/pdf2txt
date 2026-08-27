@@ -1,0 +1,16 @@
+services:
+  pdf2txt:
+    build: .
+    image: pdf2txt:latest
+    container_name: pdf2txt
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - pdf2txt-data:/app/data
+    environment:
+      # Nombre de conversions pdftotext simultanées
+      - MAX_CONCURRENT_CONVERSIONS=${MAX_CONCURRENT_CONVERSIONS:-4}
+    restart: unless-stopped
+
+volumes:
+  pdf2txt-data:

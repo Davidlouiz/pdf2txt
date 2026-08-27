@@ -133,6 +133,25 @@ Des scripts de cycle de vie sont fournis à la racine du projet :
 - Logs : `.run/server.log`, `.run/worker.log`, `.run/build.log`.
 - Le port se change avec `PORT=3100 ./start.sh`.
 
+## Docker
+
+L'application peut aussi tourner dans un conteneur (serveur + worker + `pdftotext`),
+avec les données persistées dans un volume Docker.
+
+```bash
+docker compose up -d --build     # http://localhost:3000
+docker compose down              # arrêt (les données sont conservées)
+docker compose down -v           # arrêt + suppression du volume de données
+```
+
+- Port hôte configurable : `PORT=3100 docker compose up -d`.
+- Nombre de conversions : `MAX_CONCURRENT_CONVERSIONS=8 docker compose up -d`.
+- Le volume `pdf2txt-data` (monté sur `/app/data`) conserve PDF, TXT et la base
+  SQLite d'un redémarrage à l'autre. `restart: unless-stopped` relance le
+  conteneur automatiquement.
+- Le `docker-entrypoint.sh` lance le serveur et le worker ; si le worker
+  s'arrête (crash), il est relancé automatiquement.
+
 ---
 
 ## Utilisation

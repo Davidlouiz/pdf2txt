@@ -1,0 +1,22 @@
+# Dépendances et artefacts de build (recréés dans l'image)
+node_modules
+.next
+
+# Données locales (jamais dans l'image)
+data
+.run
+
+# Git / IDE
+.git
+.gitignore
+*.log
+
+# Environnement
+.env
+.env.local
+.env*.local
+
+# Scripts d'hôte (non nécessaires dans l'image)
+start.sh
+stop.sh
+restart.sh

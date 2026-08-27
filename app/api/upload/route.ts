@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
   const nodeStream = Readable.fromWeb(body as never);
   const bb = busboy({
     headers: { 'content-type': contentType },
+    // Décoder les noms de fichiers multipart en UTF-8 (sinon les accents sont
+    // interprétés en latin1 → mojibake, ex. "août" → "aoÃ»t").
+    defParamCharset: 'utf8',
     limits: { fileSize: config.maxFileSizeBytes, files: 1, fields: 0 },
   });
 
