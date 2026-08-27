@@ -1,238 +1,225 @@
-# PDF to TXT
+<div align="center">
 
-Application web **100 % locale** permettant de déposer des fichiers PDF, de les convertir
-automatiquement en TXT avec `pdftotext`, puis de consulter, télécharger ou copier le texte.
+# 📄 PDF → TXT
 
-- Mono-utilisateur, aucun compte, aucune authentification.
-- Aucune donnée ne quitte la machine : pas de service externe, pas d'API, pas d'OCR.
-- Jusqu'à **100 fichiers** par ajout, **100 Mo** max par fichier.
-- **4 conversions simultanées** (configurable).
-- Reprise après fermeture du navigateur / redémarrage du serveur.
+**Convertissez vos PDF en texte brut, en local, sans jamais les envoyer sur Internet.**
 
----
+Application web mono-utilisateur qui dépose, convertit (via `pdftotext`) et archive
+des centaines de PDF en TXT, avec file d'attente, reprise et statistiques — le tout
+sur votre machine.
 
-## Architecture
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![pdftotext](https://img.shields.io/badge/pdftotext-Poppler-2CA5E0?style=for-the-badge&logo=gnu&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-```
-        Navigateur
-            │  HTTP
-            ▼
-   Next.js (UI + API)        Worker local (processus séparé)
-            │                         │
-            │                         ▼
-   SQLite (base locale)  ←───   pdftotext (conversion)
-   Stockage fichiers (pdf/ , txt/)
-```
+**100 % local · 0 service externe · 0 OCR · 0 compte**
 
-Deux processus indépendants :
-
-1. **Next.js** (`npm run dev` ou `npm run build` + `npm run start`) — interface + API.
-2. **Worker** (`npm run worker`) — exécute les conversions `pdftotext`.
-
-Le worker étant séparé, les conversions continuent même si aucune page n'est ouverte.
-
-> **Choix technique** : le cahier des charges recommande Supabase local + PostgreSQL, mais
-> autorise explicitement (section 45) une alternative si la complexité est disproportionnée.
-> Pour une robustesse et une simplicité maximales, **sans Docker ni serveur PostgreSQL**,
-> ce projet utilise :
-> - une base locale **SQLite** (`data/app.db`, table `files` conforme à la section 23) ;
-> - un **stockage filesystem** local (`data/pdf/<uuid>.pdf`, `data/txt/<uuid>.txt`).
->
-> L'ensemble fonctionne 100 % hors ligne, sans aucun service externe.
+</div>
 
 ---
 
-## Prérequis
+## ✨ Fonctionnalités
+
+| | |
+|---|---|
+| 🗂️ **Drag & drop + sélection multiple** | Jusqu'à **100 PDF** par ajout |
+| ⚖️ **Limites maîtrisées** | **100 Mo** max par fichier, rejets expliqués |
+| ⏩ **File d'attente persistante** | **4 conversions simultanées** (configurable) |
+| 🔁 **Reprise robuste** | Redémarrage du serveur sans perte ni double traitement |
+| 📥 **Téléchargement PDF / TXT** | Nom d'origine préservé (accents inclus) |
+| 📋 **Copier le texte** | Presse-papiers en un clic |
+| 🗑️ **Suppression définitive** | Avec confirmation, PDF + TXT + base |
+| 🔄 **Relance** | Individuelle ou « relancer tous les échecs » |
+| 📊 **Statistiques** | Terminés · en cours · en attente · échecs |
+
+---
+
+## 🛠️ Stack technique
+
+Le projet met en œuvre une stack **TypeScript full-stack moderne**, pensé pour un usage
+local robuste et sans friction :
+
+- **[Next.js 14](https://nextjs.org/)** — App Router, Route Handlers (`app/api/*`) pour l'API REST, rendu serveur + React 18 côté client.
+- **[TypeScript 5](https://www.typescriptlang.org/)** — typage strict de bout en bout (API, worker et interface partagent les mêmes types).
+- **[React 18](https://reactjs.org/)** — interface orientée productivité (liste, upload, statistiques).
+- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3/)** — base **SQLite** locale, performante et sans serveur (une seule table `files`, schéma conforme au cahier des charges).
+- **[pdftotext](https://manpages.debian.org/stable/poppler-utils/pdftotext.1.en.html)** (Poppler) — extraction du texte **localement**, sans OCR ni API externe.
+- **[busboy](https://github.com/mscdex/busboy)** — upload **streamé** multipart (pas de chargement en mémoire pour les fichiers de 100 Mo).
+- **[Docker](https://www.docker.com/)** — image multi-étapes + `docker-compose` (serveur, worker et `pdftotext` dans un conteneur, données persistées en volume).
+
+> **Choix de conception** : le cahier des charges envisageait Supabase local + PostgreSQL
+> mais autorise une alternative si la complexité est disproportionnée. Pour une
+> robustesse maximale et un fonctionnement **sans Docker ni serveur PostgreSQL**, le
+> projet utilise **SQLite** + **stockage filesystem** (`data/pdf/<uuid>.pdf`,
+> `data/txt/<uuid>.txt`). Le tout reste **100 % hors ligne**.
+
+---
+
+## 🏗️ Architecture
+
+Le traitement est découplé de l'interface : un **worker séparé** poursuit les
+conversions même si aucune page n'est ouverte.
+
+```mermaid
+flowchart LR
+    B[Navigateur] -->|HTTP| N[Next.js<br/>UI + API]
+    N --> W[Worker local<br/>processus séparé]
+    N --> DB[(SQLite<br/>base locale)]
+    W --> DB
+    W -->|pdftotext| T[TXT généré]
+    DB -->|pdf/ txt/| FS[Stockage fichiers<br/>UUID]
+```
+
+- **Next.js** (`npm run dev` / `npm run build` + `npm run start`) — interface + API REST.
+- **Worker** (`npm run worker`) — surveille la file `queued` et exécute `pdftotext`.
+
+---
+
+## 🚀 Démarrage rapide
+
+### Prérequis
 
 - **Node.js ≥ 18** (testé avec Node 20)
-- **pdftotext** (poppler-utils)
+- **pdftotext** (poppler-utils) : `sudo apt install poppler-utils`
 
-Vérifier :
-
-```bash
-node --version
-pdftotext -v
-```
-
-Sur Debian/Ubuntu :
-
-```bash
-sudo apt install poppler-utils
-```
-
----
-
-## Installation
+### Installation
 
 ```bash
 npm install
 ```
 
-Cela compile la dépendance native `better-sqlite3` (précompilée pour les plateformes courantes).
+### Lancement (2 terminaux)
+
+```bash
+# Terminal 1 — serveur web
+npm run dev          # ou : npm run build && npm run start
+
+# Terminal 2 — worker de conversion
+npm run worker
+```
+
+Ouvrez **http://localhost:3000**.
+
+### Scripts de gestion
+
+```bash
+./start.sh      # build + démarre serveur web et worker en arrière-plan
+./stop.sh       # arrête proprement les deux processus
+./restart.sh    # arrête puis redémarre
+```
+
+PIDs et journaux dans `.run/` (non versionné). Port : `PORT=3100 ./start.sh`.
 
 ---
 
-## Configuration
+## 🐳 Docker
 
-Copier le fichier d'exemple si des réglages sont nécessaires (tout est optionnel) :
+Une seule commande pour tout lancer (serveur + worker + `pdftotext`) :
 
 ```bash
-cp .env.local.example .env.local
+docker compose up -d --build     # http://localhost:3000
+docker compose down              # arrêt (données conservées)
+docker compose down -v           # arrêt + suppression des données
 ```
+
+- `PORT=3100 docker compose up -d` — port personnalisé.
+- `MAX_CONCURRENT_CONVERSIONS=8 docker compose up -d` — réglage de concurrence.
+- Volume `pdf2txt-data` → `/app/data` : PDF, TXT et base persistés.
+- `restart: unless-stopped` : relance automatique du conteneur ; le
+  `docker-entrypoint.sh` relance aussi le worker s'il crashe.
+
+---
+
+## ⚙️ Configuration
+
+Tout est optionnel (`cp .env.local.example .env.local`) et centralisé dans `lib/config.ts`.
 
 | Variable | Défaut | Description |
 |---|---|---|
 | `DATA_DIR` | `./data` | Répertoire des données (PDF, TXT, base) |
-| `MAX_CONCURRENT_CONVERSIONS` | `4` | Nombre de conversions simultanées |
+| `MAX_CONCURRENT_CONVERSIONS` | `4` | Conversions simultanées |
 | `PDFTOTEXT_PATH` | `pdftotext` | Chemin de l'exécutable |
 | `PORT` | `3000` | Port du serveur |
 
-La base et les répertoires de stockage sont créés automatiquement au premier accès.
-Pour les créer sans lancer le serveur :
+Scripts utiles :
 
 ```bash
-npm run db:init
+npm run db:init             # initialise la base + répertoires
+npm run db:fix-filenames    # répare les noms de fichiers mojibake (accents)
 ```
 
 ---
 
-## Lancement
+## 🔌 API REST
 
-**Terminal 1 — le serveur web** (mode développement) :
-
-```bash
-npm run dev
-```
-
-Ou en mode production :
-
-```bash
-npm run build
-npm run start
-```
-
-**Terminal 2 — le worker de conversion** :
-
-```bash
-npm run worker
-```
-
-Puis ouvrir : http://localhost:3000
-
-### Scripts de gestion
-
-Des scripts de cycle de vie sont fournis à la racine du projet :
-
-```bash
-./start.sh      # build + démarre serveur web et worker en arrière-plan
-./stop.sh       # arrête proprement serveur et worker
-./restart.sh    # arrête puis redémarre
-```
-
-- Les PIDs et journaux sont stockés dans `.run/` (non versionné).
-- Logs : `.run/server.log`, `.run/worker.log`, `.run/build.log`.
-- Le port se change avec `PORT=3100 ./start.sh`.
-
-## Docker
-
-L'application peut aussi tourner dans un conteneur (serveur + worker + `pdftotext`),
-avec les données persistées dans un volume Docker.
-
-```bash
-docker compose up -d --build     # http://localhost:3000
-docker compose down              # arrêt (les données sont conservées)
-docker compose down -v           # arrêt + suppression du volume de données
-```
-
-- Port hôte configurable : `PORT=3100 docker compose up -d`.
-- Nombre de conversions : `MAX_CONCURRENT_CONVERSIONS=8 docker compose up -d`.
-- Le volume `pdf2txt-data` (monté sur `/app/data`) conserve PDF, TXT et la base
-  SQLite d'un redémarrage à l'autre. `restart: unless-stopped` relance le
-  conteneur automatiquement.
-- Le `docker-entrypoint.sh` lance le serveur et le worker ; si le worker
-  s'arrête (crash), il est relancé automatiquement.
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/api/upload` | Upload streamé d'un PDF |
+| `GET` | `/api/files` | Liste des fichiers (du plus récent au plus ancien) |
+| `DELETE` | `/api/files?id=` | Suppression définitive |
+| `GET` | `/api/download?id=&type=` | Téléchargement PDF / TXT |
+| `GET` | `/api/text?id=` | Contenu TXT (copie presse-papiers) |
+| `POST` | `/api/retry` | Relance individuelle (`{id}`) ou globale (`{all:true}`) |
+| `POST` | `/api/cancel` | Annulation (`{id}`) |
 
 ---
 
-## Utilisation
+## 🔁 Cycle de vie des fichiers
 
-1. Glissez-déposez des PDF (ou utilisez « Ajouter des fichiers »).
-2. Les uploads démarrent avec une progression individuelle.
-3. Le worker traite **4 fichiers à la fois** ; les suivants attendent.
-4. Les TXT apparaissent progressivement dans la liste.
-5. Téléchargez le PDF ou le TXT, ou copiez le texte dans le presse-papiers.
+| Statut | Signification | Actions |
+|---|---|---|
+| `uploading` | Envoi vers le stockage | progression affichée |
+| `queued` | Uploadé, en attente | Annuler |
+| `processing` | Conversion `pdftotext` | Annuler |
+| `completed` | TXT généré | Télécharger PDF/TXT · Copier · Supprimer |
+| `failed` | Échec (raison affichée) | Relancer · Télécharger PDF · Supprimer |
+| `cancelled` | Annulé par l'utilisateur | Relancer · Télécharger PDF · Supprimer |
 
-### Statuts
-
-| Statut | Signification |
-|---|---|
-| `uploading` | Envoi vers le stockage local |
-| `queued` | Uploadé, en attente de traitement |
-| `processing` | En cours de conversion `pdftotext` |
-| `completed` | TXT généré avec succès |
-| `failed` | La conversion a échoué (raison affichée) |
-| `cancelled` | Traitement annulé par l'utilisateur |
-
-### Actions disponibles
-
-| Statut | Actions |
-|---|---|
-| Uploading | (progression affichée) |
-| Queued | Annuler |
-| Processing | Annuler |
-| Completed | Télécharger PDF, Télécharger TXT, Copier le texte, Supprimer |
-| Failed | Relancer, Télécharger PDF, Supprimer |
-| Cancelled | Relancer, Télécharger PDF, Supprimer |
-
-**Relancer tous les échecs** remet tous les fichiers en échec dans la file. Les fichiers
-réussis ne sont jamais retraités.
+**Reprise** : au démarrage, le worker remet les conversions laissées `processing`
+(crash) en `queued` et les retraite. Un fichier `completed` n'est **jamais** retraité.
 
 ---
 
-## Reprise après redémarrage
-
-- L'état (statuts, historique) est persisté dans la base SQLite, pas dans le navigateur.
-- À la fermeture de l'onglet, rien n'est perdu.
-- Au démarrage, le worker remet les conversions laissées `processing` (crash) en `queued`
-  pour les reprendre automatiquement. Un fichier déjà `completed` n'est **jamais** retraité.
-
----
-
-## Structure du projet
+## 🗂️ Structure du projet
 
 ```
 app/
   page.tsx                  Interface principale
-  api/
-    upload/                 POST — upload streamé d'un PDF
-    files/                  GET — liste · DELETE — suppression
-    download/               GET — téléchargement PDF / TXT
-    text/                   GET — contenu TXT (copie presse-papiers)
-    retry/                  POST — relance individuelle / globale
-    cancel/                 POST — annulation
-components/
-  FileUploader.tsx          Bouton + glisser-déposer + uploads
-  FileList.tsx / FileRow.tsx
-  Stats.tsx / ProgressBar.tsx
+  api/                      Route Handlers (upload, files, download, text, retry, cancel)
+components/                 FileUploader, FileList, FileRow, Stats, ProgressBar
 lib/
   config.ts                 Configuration centralisée
   db.ts                     Base SQLite + schéma
-  types.ts / format.ts / api.ts / client-config.ts
+  types.ts · format.ts · api.ts · client-config.ts
 worker/
   worker.ts                 Processus de conversion pdftotext
 db/
   schema.sql                Schéma de référence
 scripts/
-  init-db.ts                Initialisation de la base
+  init-db.ts · fix-mojibake.ts
+Dockerfile · docker-compose.yml · docker-entrypoint.sh
+start.sh · stop.sh · restart.sh
 ```
 
 ---
 
-## Sécurité (application locale)
+## 🔒 Sécurité (application locale)
 
-- Aucune commande shell n'est construite à partir du nom de fichier utilisateur
-  (`pdftotext` est lancé avec des arguments séparés, jamais via une chaîne de shell).
-- Les chemins physiques utilisent des **UUID**, jamais le nom utilisateur.
-- Les extensions, MIME et tailles sont validées ; le contenu doit commencer par `%PDF-`.
-- Le nom original n'est utilisé que pour le téléchargement (via `Content-Disposition`).
-- Les limites sont centralisées dans `lib/config.ts`.
+- Aucune commande shell construite depuis le nom de fichier utilisateur
+  (`pdftotext` lancé avec des arguments séparés, jamais via un shell).
+- Chemins physiques en **UUID**, jamais le nom utilisateur.
+- Validation extension / MIME / taille, contenu devant commencer par `%PDF-`.
+- Nom d'origine utilisé uniquement pour le téléchargement (`Content-Disposition`).
+- Limites centralisées dans `lib/config.ts`.
+
+---
+
+<div align="center">
+
+Fait avec ❤️ · 100 % local · Vos documents ne quittent jamais votre machine.
+
+</div>
+
