@@ -119,6 +119,20 @@ npm run worker
 
 Puis ouvrir : http://localhost:3000
 
+### Scripts de gestion
+
+Des scripts de cycle de vie sont fournis à la racine du projet :
+
+```bash
+./start.sh      # build + démarre serveur web et worker en arrière-plan
+./stop.sh       # arrête proprement serveur et worker
+./restart.sh    # arrête puis redémarre
+```
+
+- Les PIDs et journaux sont stockés dans `.run/` (non versionné).
+- Logs : `.run/server.log`, `.run/worker.log`, `.run/build.log`.
+- Le port se change avec `PORT=3100 ./start.sh`.
+
 ---
 
 ## Utilisation

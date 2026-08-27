@@ -8,6 +8,9 @@ out/
 # Données locales (PDF, TXT, base SQLite) — jamais versionnées
 data/
 
+# Artefacts d'exécution (PIDs, logs des scripts start/stop/restart)
+.run/
+
 # Environnement local
 .env
 .env.local
